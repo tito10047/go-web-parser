@@ -6,3 +6,7 @@ port = 3306
 name = "stavkova"
 user = "root"
 password = "mostka"
+charset = "utf8"
+timezone = "Europe/Bratislava"
+
+[system]
