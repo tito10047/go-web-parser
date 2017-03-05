@@ -56,7 +56,6 @@ func main() {
 	for _, site := range sites {
 		fmt.Println(site)
 	}
-	//rt
 }
 
 func getDbSource(dbSett databaseInfo) string {
