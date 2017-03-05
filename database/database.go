@@ -183,6 +183,8 @@ func (d *Database) FlushEntities() {
 	if d.entriesIndex==0{
 		return
 	}
+	d.muxDB.Lock()
+	defer d.muxDB.Unlock()
 	sqlStr := "INSERT INTO bet_entry(id_bet_company, id_bet_sport, id_bet_type, id_bet_team, rate, max_bet, date, org_id) VALUES "
 	sqlSubStr := strings.Repeat("?,", entriesColumnCount)
 	sqlSubStr = sqlSubStr[0:len(sqlSubStr)-1]

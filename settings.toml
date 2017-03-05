@@ -10,4 +10,4 @@ charset = "utf8"
 timezone = "Europe/Bratislava"
 
 [system]
-routine_count=1000
+routine_count=100

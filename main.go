@@ -77,8 +77,8 @@ func main() {
 			guard := make(chan struct{}, MAX_ROUTINES)
 
 			for site.HasNext() {
-				wg.Add(1)
 				guard <- struct{}{}
+				wg.Add(1)
 				go func(site sites.Site) {
 					defer wg.Done()
 

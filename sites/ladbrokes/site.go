@@ -4,10 +4,6 @@ import (
 	"stavkova/database"
 	"stavkova/sites"
 	"fmt"
-	"net/http"
-	"crypto/tls"
-	"bytes"
-	"io"
 )
 
 type Site struct {
@@ -29,36 +25,14 @@ func NewSite(id int, db *database.Database) *sites.Site {
 
 func (s *Site) ParseNext() {
 	//fmt.Println("stating read in step",s.cnt)
-	req, err := http.NewRequest("GET", "https://warofbastards.com", nil)
-	if err != nil {
-		fmt.Println(err)
-		s.ok=false
-		return
-	}
-	req.Header.Set("Accept", "application/json")
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-	response, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		s.ok=false
-		return
-	}
-	defer response.Body.Close()
-
-	buf := bytes.NewBuffer(nil)
-	io.Copy(buf, response.Body)
-
-	if buf.Len()==0{
+	/*if buf.Len()==0{
 		fmt.Println("bad:",response.StatusCode)
 		s.ok=false
-	}
+	}*/
 
 	//body := string(b)
-	fmt.Println("reader",buf.Len(),"bytes in step",s.cnt)
+	fmt.Println("reader",0,"bytes in step",s.cnt)
 }
 
 func (s *Site) HasNext() bool {
