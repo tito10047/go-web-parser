@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 	"strings"
+	"stavkova/misc"
 )
 
 const entriesBufferLength = 50
@@ -14,6 +15,7 @@ const entriesColumnCount = 8
 
 type Database struct {
 	db           *sql.DB
+	similarity   float64
 	sports       map[string]int
 	types        map[string]int
 	teams        map[int]map[string]int
@@ -26,10 +28,11 @@ type Database struct {
 	muxEntries   sync.Mutex
 }
 
-func NewDatabase(dbSource *sql.DB) (*Database, error) {
+func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
 
 	db := &Database{
 		db:           dbSource,
+		similarity:   similarity,
 		sports:       make(map[string]int),
 		types:        make(map[string]int),
 		teams:        make(map[int]map[string]int),
@@ -84,16 +87,19 @@ func (d *Database) GetSportId(name string) (int, bool) {
 		}
 		return id, true
 	}
+
+	sportId := d.findSimilarId(d.sports, name)
+
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	stmt, err := d.db.Prepare("INSERT bet_sport_name SET name=?")
+	stmt, err := d.db.Prepare("INSERT bet_sport_name SET name=?, id_bet_sport=?")
 	if err != nil {
 		fmt.Println(err)
 		return 0, false
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(name)
+	_, err = stmt.Exec(name, sportId)
 	if err != nil {
 		fmt.Println(err)
 		return 0, false
@@ -111,15 +117,18 @@ func (d *Database) GetTypeId(name string) (int, bool) {
 		}
 		return id, true
 	}
+
+	typeId := d.findSimilarId(d.types, name)
+
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	stmt, err := d.db.Prepare("INSERT bet_type_name SET name=?")
+	stmt, err := d.db.Prepare("INSERT bet_type_name SET name=?, id_bet_type=?")
 	if err != nil {
 		fmt.Println(err)
 		return 0, false
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(name)
+	_, err = stmt.Exec(name, typeId)
 	if err != nil {
 		fmt.Println(err)
 		return 0, false
@@ -138,15 +147,18 @@ func (d *Database) GetTeamId(sportId int, name string) (int, bool) {
 	} else {
 		d.teams[sportId] = make(map[string]int)
 	}
+
+	teamId  := d.findSimilarId(d.teams[sportId], name)
+
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	stmt, err := d.db.Prepare("INSERT `bet_team_name` SET `id_bet_sport`=?, `name`=?")
+	stmt, err := d.db.Prepare("INSERT `bet_team_name` SET `id_bet_sport`=?, id_bet_team=?, `name`=?")
 	if err != nil {
 		fmt.Println(err)
 		return 0, false
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(sportId, name)
+	_, err = stmt.Exec(sportId, teamId, name)
 	if err != nil {
 		fmt.Println(err)
 		return 0, false
@@ -170,9 +182,9 @@ func (d *Database) InsertEntry(siteId, sportId, typeId, teamId int, rate, maxBet
 	d.entries[d.entriesIndex+5] = maxBet
 	d.entries[d.entriesIndex+6] = date
 	d.entries[d.entriesIndex+7] = orgId
-	d.entriesIndex+=entriesColumnCount
+	d.entriesIndex += entriesColumnCount
 
-	if d.entriesIndex<entriesBufferLength+entriesColumnCount-1{
+	if d.entriesIndex < entriesBufferLength+entriesColumnCount-1 {
 		return
 	}
 
@@ -180,7 +192,7 @@ func (d *Database) InsertEntry(siteId, sportId, typeId, teamId int, rate, maxBet
 }
 
 func (d *Database) FlushEntities() {
-	if d.entriesIndex==0{
+	if d.entriesIndex == 0 {
 		return
 	}
 	d.muxDB.Lock()
@@ -201,5 +213,19 @@ func (d *Database) FlushEntities() {
 		fmt.Println(d.entries[0:d.entriesIndex])
 		panic(err)
 	}
-	d.entriesIndex=0
+	d.entriesIndex = 0
+}
+
+func (d *Database) findSimilarId(m map[string]int, name string) sql.NullInt64 {
+	id := sql.NullInt64{Valid: false}
+	var max float64 = 0
+	for maybeName, maybeId := range m {
+		percent := misc.SimilarTextPercent(name, maybeName)
+		if maybeId != -1 && percent > d.similarity && percent > max {
+			max = percent
+			id.Valid = true
+			id.Int64 = int64(maybeId)
+		}
+	}
+	return id
 }

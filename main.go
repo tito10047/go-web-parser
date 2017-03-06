@@ -25,6 +25,7 @@ func main() {
 		fmt.Println("cant read settings.toml file")
 		panic(err)
 	}
+
 	dbSett := settings.DB
 
 	sourceName := getDbSource(dbSett)
@@ -35,7 +36,7 @@ func main() {
 	}
 	defer dbSource.Close()
 
-	db, err := database.NewDatabase(dbSource)
+	db, err := database.NewDatabase(dbSource, settings.System.Similar)
 	if err != nil {
 		fmt.Println("cant create db")
 		panic(err)
