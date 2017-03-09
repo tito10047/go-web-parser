@@ -19,7 +19,7 @@ func (d *Database) loadSports() error {
 		var idSport sql.NullInt64
 		var name string
 		var enabled sql.NullBool
-		if err := names.Scan(&idSport, &name); err != nil {
+		if err := names.Scan(&idSport, &name, &enabled); err != nil {
 			fmt.Println(err)
 			continue
 		}

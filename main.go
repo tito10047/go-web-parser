@@ -59,39 +59,42 @@ func main() {
 	}
 
 	var sitesArr []sites.Site
-	for site := range sites.NextSite(getId,nil){
+	for site := range sites.NextSite(getId,db){
 		sitesArr = append(sitesArr, *site)
 	}
 
 	var wg sync.WaitGroup
 	var MAX_ROUTINES int = settings.System.RoutineCount/len(sitesArr)
 	fmt.Println("MAX_ROUTINES",MAX_ROUTINES)
-	if MAX_ROUTINES<10{
+	if MAX_ROUTINES<3{
 		fmt.Println("minimum coroutines is 10")
 		return
 	}
-	for _,site := range sitesArr {
+	guard := make([]chan struct{},len(sitesArr))
+	for index,site := range sitesArr {
 		wg.Add(1)
 		fmt.Println("starting main routine for site ",site.GetId())
-		go func(site sites.Site) {
+		go func(site sites.Site, index int) {
 			defer wg.Done()
-			guard := make(chan struct{}, MAX_ROUTINES)
-
+			guard[index] = make(chan struct{}, MAX_ROUTINES)
+			site.Setup(MAX_ROUTINES)
 			for site.HasNext() {
-				guard <- struct{}{}
+				guard[index] <- struct{}{}
 				wg.Add(1)
-				go func(site sites.Site) {
+				go func(site sites.Site, index int) {
 					defer wg.Done()
 
 					site.ParseNext()
 
-					<-guard
-				}(site)
+					<-guard[index]
+				}(site, index)
 			}
-			close(guard)
-		}(site)
+		}(site, index)
 	}
 	wg.Wait()
+	for _,ch := range guard{
+		close(ch)
+	}
 }
 
 func getDbSource(dbSett src.DatabaseInfo) string {

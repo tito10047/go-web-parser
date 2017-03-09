@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"strconv"
 	"errors"
+	"encoding/json"
 )
 
 type contentType string
@@ -26,6 +27,7 @@ func NewDownloader(method, url string) (*downloader, error) {
 	if err != nil {
 		return nil, err
 	}
+	r.Header.Add("User-Agent","Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36")
 	d := &downloader{r}
 	return d, nil
 }
@@ -78,6 +80,18 @@ func (r *downloader) Download() (string, error) {
 	buf := bytes.NewBuffer(nil)
 	io.Copy(buf, response.Body)
 	return buf.String(), nil
+}
+
+func (r *downloader) DownloadJson(object interface{}) error {
+	jsonStream, err := r.Download()
+	if err!=nil {
+		return err
+	}
+	err = json.Unmarshal([]byte(jsonStream),object)
+	if err!=nil {
+		return err
+	}
+	return nil
 }
 
 func (r *downloader) AcceptJson() {

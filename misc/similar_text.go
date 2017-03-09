@@ -32,9 +32,11 @@ func SimilarText(first, second string) int {
 		}
 
 		if (pos1+max < firstLength) && (pos2+max < secondLength) {
+			i := first[pos1+max:firstLength]
+			i2 := second[pos2+max:secondLength]
 			sum += SimilarText(
-				first[pos1+max:firstLength-pos1-max],
-				second[pos2+max:secondLength-pos2-max])
+				i,
+				i2)
 		}
 	}
 
