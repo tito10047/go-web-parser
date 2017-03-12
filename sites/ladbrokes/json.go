@@ -12,18 +12,18 @@ type groups struct {
 	Href         string `json:"href"`
 	DeepLinkHref string `json:"deepLinkHref"`
 	SortOrder    int `json:"sortOrder"`
-	Id string `json:"id"`
+	Id           string `json:"id"`
 }
 
 type group struct {
-	Meta      string `json:"meta"`
-	Text      string `json:"text"`
-	Href      string `json:"href"`
+	Meta         string `json:"meta"`
+	Text         string `json:"text"`
+	Href         string `json:"href"`
 	DeepLinkHref string `json:"deepLinkHref"`
-	Icon      string `json:"icon"`
-	Id string `json:"id"`
-	SortOrder int `json:"sortOrder"`
-	Event     bool `json:"event"`
+	Icon         string `json:"icon"`
+	Id           string `json:"id"`
+	SortOrder    int `json:"sortOrder"`
+	Event        bool `json:"eventDetail"`
 }
 
 //sport_competition_links  https://sports.ladbrokes.com/en-gb/sport_competition_links/110000006
@@ -38,15 +38,19 @@ type allEvents struct {
 }
 
 type eventGroup struct {
-	List []event `json:"list"`
+	List []eventDetail `json:"list"`
+}
+
+type eventDetail struct {
+	Id           string `json:"id"`
+	Event event `json:"event"`
 }
 
 type event struct {
-	Id string `json:"id"`
-	Stats eventStat `json:"stats"`
+	Participants []participant `json:"participants"`
 }
 
-type eventStat struct {
-	NameA string `json:"nameA"`
-	NameB string `json:"nameB"`
+type participant struct {
+	Id string `json:"id"`
+	Name string `json:"name"`
 }

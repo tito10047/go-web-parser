@@ -26,11 +26,13 @@ func (ts *TaskStack) AddTask(task int8, url string, args []interface{})  {
 	ts.taskLocker.Lock()
 	defer ts.taskLocker.Unlock()
 	ts.taskCount++
-	ts.tasks <- &Task{
-		task,
-		url,
-		args,
-	}
+	go func() {
+		ts.tasks <- &Task{
+			task,
+			url,
+			args,
+		}
+	}()
 }
 
 func (ts *TaskStack) EndTask()  {
@@ -48,11 +50,14 @@ func (ts *TaskStack) NextTask() (*Task, bool) {
 }
 
 func (ts *TaskStack ) HasTask() bool {
+	ts.taskLocker.Lock()
+	defer ts.taskLocker.Unlock()
 	return ts.taskCount==0
 }
 
 func (ts *TaskStack) CloseTasks() {
 	close(ts.tasks)
+	ts.taskCount = 0
 }
 
 type Site interface {

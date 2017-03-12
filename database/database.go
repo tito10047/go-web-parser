@@ -10,22 +10,16 @@ import (
 	"stavkova/misc"
 )
 
-const entriesBufferLength = 50
-const entriesColumnCount = 8
-
 type Database struct {
 	db           *sql.DB
 	similarity   float64
 	sports       map[string]int
 	types        map[string]int
 	teams        map[int]map[string]int
-	entries      [entriesBufferLength * entriesColumnCount]interface{}
-	entriesIndex int
 	muxSports    sync.Mutex
 	muxTypes     sync.Mutex
 	muxTeams     sync.Mutex
 	muxDB        sync.Mutex
-	muxEntries   sync.Mutex
 }
 
 func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
@@ -36,7 +30,6 @@ func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
 		sports:       make(map[string]int),
 		types:        make(map[string]int),
 		teams:        make(map[int]map[string]int),
-		entriesIndex: 0,
 	}
 
 	if err := db.loadSports(); err != nil {
@@ -167,54 +160,68 @@ func (d *Database) GetTeamId(sportId int, name string) (int, bool) {
 	return 0, false
 }
 
+type EntryTeam struct {
+	TeamId sql.NullInt64
+	Odd	float64
+}
 /**
  * @
  */
-func (d *Database) InsertEntry(siteId, sportId, typeId, teamId int, rate, maxBet float32, date time.Time, orgId int) {
-	d.muxEntries.Lock()
-	defer d.muxEntries.Unlock()
-
-	d.entries[d.entriesIndex+0] = siteId
-	d.entries[d.entriesIndex+1] = sportId
-	d.entries[d.entriesIndex+2] = typeId
-	d.entries[d.entriesIndex+3] = teamId
-	d.entries[d.entriesIndex+4] = rate
-	d.entries[d.entriesIndex+5] = maxBet
-	d.entries[d.entriesIndex+6] = date
-	d.entries[d.entriesIndex+7] = orgId
-	d.entriesIndex += entriesColumnCount
-
-	if d.entriesIndex < entriesBufferLength+entriesColumnCount-1 {
-		return
-	}
-
-	d.FlushEntities()
-}
-
-func (d *Database) FlushEntities() {
-	if d.entriesIndex == 0 {
-		return
-	}
+func (d *Database) InsertEntry(siteId, sportId, typeId int, teams[]EntryTeam, date time.Time, orgId int) {
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	sqlStr := "INSERT INTO bet_entry(id_bet_company, id_bet_sport, id_bet_type, id_bet_team, rate, max_bet, date, org_id) VALUES "
-	sqlSubStr := strings.Repeat("?,", entriesColumnCount)
-	sqlSubStr = sqlSubStr[0:len(sqlSubStr)-1]
-	sqlStr += strings.Repeat("("+sqlSubStr+"),", d.entriesIndex/entriesColumnCount)
-	sqlStr = sqlStr[0:len(sqlStr)-1]
-	stmt, err := d.db.Prepare(sqlStr)
-	if err != nil {
-		fmt.Println(sqlStr)
-		panic(err)
-	}
+
+	stmt, err := d.db.Prepare("SELECT * FROM `bet_entry` WHERE `id_bet_company`=? AND `id_bet_sport`=? AND `id_bet_type`=? AND `org_id`=?")
 	defer stmt.Close()
-	_, err = stmt.Exec(d.entries[0:d.entriesIndex]...)
 	if err != nil {
-		fmt.Println(d.entries[0:d.entriesIndex])
-		panic(err)
+		fmt.Println(err)
+		return
 	}
-	d.entriesIndex = 0
+	entryRow := stmt.QueryRow(sportId)
+
+	var entryId int64
+	err = entryRow.Scan(&entryId)
+	if err!=nil{
+		if err!=sql.ErrNoRows{
+			fmt.Println(err)
+			return
+		}
+
+		stmt, err = d.db.Prepare("INSERT `bet_entry` SET `id_bet_company`=?, `id_bet_sport`=?, `id_bet_type`=?, `max_bet`=?, `date`=?, `org_id`=?, ")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer stmt.Close()
+		//TODO: max bet
+		res, err := stmt.Exec(siteId, sportId, typeId,0,date,orgId)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		entryId, err = res.LastInsertId()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+
+	for _,entry := range teams{
+		stmt, err = d.db.Prepare("INSERT INTO `bet_entry_team` (`id_entry`, `id_team`, `odd`) VALUES (?,?,?) on duplicate key update `odd`=?")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		_, err := stmt.Exec(entryId, typeId, entry.TeamId, entry.Odd)
+		if err != nil {
+			fmt.Println(err)
+		}
+		stmt.Close()
+	}
+
+	return
 }
+
 
 func (d *Database) findSimilarId(m map[string]int, name string) sql.NullInt64 {
 	id := sql.NullInt64{Valid: false}

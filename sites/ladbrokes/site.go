@@ -4,10 +4,15 @@ import (
 	"stavkova/database"
 	"stavkova/sites"
 	"fmt"
+	"log"
+	"golang.org/x/net/websocket"
+	"errors"
+	"strings"
 )
 
 const (
 	host                   = "https://sports.ladbrokes.com"
+	wsHost                 = "wss://sports.ladbrokes.com"
 	parseSportList    int8 = iota
 	parseCompetitions
 	parseEvents
@@ -29,6 +34,7 @@ func NewSite(id int, db *database.Database) *sites.Site {
 }
 
 func (s *Site) Setup(routinesCount int) {
+	s.TaskStack = sites.NewTaskStack(routinesCount)
 	s.AddTask(parseSportList, host+"/en-gb/az_list", nil)
 }
 
@@ -50,7 +56,9 @@ func (s *Site) ParseNext() {
 	case parseEvents:
 		err = s.parseEvents(task.Url, task.Params[0].(int))
 	case parseEvent:
-		err = s.parseEvent(task.Params[0].(int),task.Params[1].(int),task.Params[2].(int),task.Params[3].(string))
+		err = s.parseEvent(task.Params[0].(int), task.Params[1].(int), task.Params[2].(int), task.Params[3].(string))
+	default:
+		err = errors.New("some is wrong")
 	}
 	if err != nil {
 		s.CloseTasks()
@@ -63,6 +71,7 @@ func (s *Site) HasNext() bool {
 }
 
 func (s *Site) parseSportList(url string) (err error) {
+	defer s.EndTask()
 	d, err := sites.NewDownloader("GET", url)
 	if err != nil {
 		return
@@ -78,11 +87,11 @@ func (s *Site) parseSportList(url string) (err error) {
 			s.AddTask(parseCompetitions, host+"/en-gb/sport_competition_links/"+sport.Icon, []interface{}{id})
 		}
 	}
-	s.EndTask()
 	return nil
 }
 
 func (s *Site) parseCompetition(url string, sportId int) (err error) {
+	defer s.EndTask()
 	d, err := sites.NewDownloader("GET", url)
 	if err != nil {
 		return
@@ -93,15 +102,17 @@ func (s *Site) parseCompetition(url string, sportId int) (err error) {
 		return
 	}
 
-	for _, competition := range competitions.LinkGroupsForClasses {
-		s.AddTask(parseEvents, host+"/en-gb/events/type/0/0/"+competition.Id, []interface{}{sportId})
+	for _, competitionGroup := range competitions.LinkGroupsForClasses {
+		for _, competition := range competitionGroup.List {
+			s.AddTask(parseEvents, host+"/en-gb/events/type/0/0/"+competition.Id, []interface{}{sportId})
+		}
 	}
 
-	s.EndTask()
 	return nil
 }
 
 func (s *Site) parseEvents(url string, sportId int) (err error) {
+	defer s.EndTask()
 	d, err := sites.NewDownloader("GET", url)
 	if err != nil {
 		return
@@ -113,20 +124,94 @@ func (s *Site) parseEvents(url string, sportId int) (err error) {
 	}
 
 	for _, event := range events.AllEventsGroup.List {
-		aTeamId, okA := s.db.GetTeamId(sportId,event.Stats.NameA)
-		bTeamId, okB := s.db.GetTeamId(sportId,event.Stats.NameB)
-		if okA==false || okB==false {
+		if len(event.Event.Participants)==0{
 			continue
 		}
-		s.AddTask(parseEvent, "", []interface{}{sportId,aTeamId,bTeamId, event.Id})
+		if len(event.Event.Participants)<2{
+			return errors.New("cosi je zle")
+		}
+		aTeamId, okA := s.db.GetTeamId(sportId, event.Event.Participants[0].Name)
+		bTeamId, okB := s.db.GetTeamId(sportId, event.Event.Participants[1].Name)
+		if okA == false || okB == false {
+			continue
+		}
+		s.AddTask(parseEvent, "", []interface{}{sportId, aTeamId, bTeamId, event.Id})
 	}
 
-	s.EndTask()
 	return nil
 }
 
-func (s *Site) parseEvent(sportId,aTeamId,bTeamId int, realSportId string) (err error) {
-	
+func getJsonMatch(eventId string) (string, error) {
+
+	origin := "https://sports.ladbrokes.com"
+	url := "wss://sports.ladbrokes.com/api/055/lwefiu0x/websocket"
+
+	ws, err := websocket.Dial(url, "", origin)
+	if err != nil {
+		return "",err
+	}
+	defer ws.Close()
+	var msg = make([]byte, 1024)
+	var n int
+	if n, err = ws.Read(msg); err != nil {
+		log.Fatal(err)
+	}
+	msgs := string(msg[:n])
+	if msgs!="o"{
+		panic(errors.New("bad response 1 '"+msgs+"'"))
+	}
+	if _, err := ws.Write([]byte("[\"CONNECT\\nprotocol-version:1.3\\naccept-version:1.1,1.0\\nheart-beat:10000,10000\\n\\n\\u0000\"]\\n")); err != nil {
+		return "",err
+	}
+	msg = make([]byte, 1024)
+	if n, err = ws.Read(msg); err != nil {
+		log.Fatal(err)
+	}
+	msgs = string(msg[:n])
+	if msgs!="a[\"CONNECTED\\nversion:1.1\\nheart-beat:10000,10000\\n\\n\\u0000\"]"{
+		return "",errors.New("bad response 2 '"+msgs+"'")
+	}
+	if _, err := ws.Write([]byte("[\"SUBSCRIBE\\nid:/user/request-response\\ndestination:/user/request-response\\n\\n\\u0000\"]")); err != nil {
+		log.Fatal(err)
+	}
+	msg = make([]byte, 1024)
+	if n, err = ws.Read(msg); err != nil {
+		log.Fatal(err)
+	}
+	msgs = string(msg[:n])
+	if len(msgs)<22 || msgs[:22]!="a[\"MESSAGE\\ntype:READY"{
+		return "",errors.New("bad response 3 '"+msgs+"'")
+	}
+	if _, err := ws.Write([]byte("[\"SUBSCRIBE\\nid:/api/en-GB/events/"+eventId+"\\ndestination:/api/en-GB/events/"+eventId+"\\n\\n\\u0000\"]")); err != nil {
+		//if _, err := ws.Write([]byte("[\"SUBSCRIBE\\nid:/api/en-GB/eventDetail-groups/EventGroup-LIVE-110000006-F\\ndestination:/api/en-GB/eventDetail-groups/EventGroup-LIVE-110000006-F\\n\\n\\u0000\"]")); err != nil {
+		log.Fatal(err)
+	}
+	msg=nil
+	result := ""
+	msg = make([]byte,1024*10)
+	for {
+		if n, err = ws.Read(msg); err != nil {
+			return "",err
+		}
+		msgs = string(msg[:n])
+		result+=msgs
+		if len(msgs)<7 || msgs[len(msgs)-7:]=="\"null\"]"{
+			return "",errors.New("bad response 4 '"+msgs+"' '"+result[len(result)-50:]+"'")
+		}
+		if msgs[len(msgs)-8:]=="\\u0000\"]"{
+			break
+		}
+	}
+	arrs := strings.Split(result,`\n`)
+	result = arrs[len(arrs)-1]
+	result = result[0:len(result)-8]
+	result = strings.Replace(result,`\"`,`"`,-1)
+	return result, nil
+}
+
+func (s *Site) parseEvent(sportId, aTeamId, bTeamId int, realSportId string) (err error) {
+	defer s.EndTask()
+	return nil
 }
 
 func init() {

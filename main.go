@@ -14,7 +14,7 @@ import (
 	"sync"
 )
 
-
+const MIN_ROUTINES = 1
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -41,7 +41,6 @@ func main() {
 		fmt.Println("cant create db")
 		panic(err)
 	}
-	defer db.FlushEntities()
 
 	dbSites, err := db.GetSites()
 	if err!=nil {
@@ -66,8 +65,8 @@ func main() {
 	var wg sync.WaitGroup
 	var MAX_ROUTINES int = settings.System.RoutineCount/len(sitesArr)
 	fmt.Println("MAX_ROUTINES",MAX_ROUTINES)
-	if MAX_ROUTINES<3{
-		fmt.Println("minimum coroutines is 10")
+	if MAX_ROUTINES<MIN_ROUTINES{
+		fmt.Println("minimum coroutines is "+strconv.Itoa(MIN_ROUTINES)+", now is "+strconv.Itoa(MAX_ROUTINES))
 		return
 	}
 	guard := make([]chan struct{},len(sitesArr))
