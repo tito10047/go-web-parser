@@ -16,6 +16,5 @@ type DatabaseInfo struct {
 }
 
 type SystemInfo struct {
-	RoutineCount int `toml:"routine_count"`
 	Similar float64 `toml:"similar_text_percent"`
 }

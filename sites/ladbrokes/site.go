@@ -21,25 +21,21 @@ const (
 
 type Site struct {
 	*sites.TaskStack
-	id  int
-	db  *database.Database
-	cnt int
-	ok  bool
+	dbSite *database.DbSite
+	db     *database.Database
+	cnt    int
+	ok     bool
 }
 
-func NewSite(id int, db *database.Database) *sites.Site {
-	i := Site{id: id, db: db, ok: true}
-	var site sites.Site = &i
-	return &site
+func NewSite(sbSite *database.DbSite, db *database.Database) *sites.SiteInt {
+	i := &Site{dbSite: sbSite, db: db, ok: true}
+	v := sites.SiteInt(i)
+	return &v
 }
 
-func (s *Site) Setup(routinesCount int) {
-	s.TaskStack = sites.NewTaskStack(routinesCount)
+func (s *Site) Setup(routinesCount, tasksPerTime, waitSeconds int) {
+	s.TaskStack = sites.NewTaskStack(routinesCount, tasksPerTime, waitSeconds)
 	s.AddTask(parseSportList, host+"/en-gb/az_list", nil)
-}
-
-func (s *Site) GetId() int {
-	return s.id
 }
 
 func (s *Site) ParseNext() {
@@ -68,6 +64,10 @@ func (s *Site) ParseNext() {
 
 func (s *Site) HasNext() bool {
 	return s.HasTask() == false && s.ok == true
+}
+
+func (s *Site) GetArgs() *database.DbSite {
+	return s.dbSite
 }
 
 func (s *Site) parseSportList(url string) (err error) {

@@ -5,11 +5,40 @@ import (
 	"golang.org/x/net/websocket"
 	"log"
 	"errors"
-	"io/ioutil"
 	"strings"
+	"time"
+	"encoding/json"
+	"fmt"
 )
 
+type allMarkets struct {
+	Status string `json:"status"`
+	Markets []market `json:"markets"`
+	CorrectScore1Selections []market `json:"correctScore1Selections"`
+	CorrectScoreXSelections []market `json:"correctScoreXSelections"`
+	CorrectScore2Selections []market `json:"correctScore2Selections"`
+	StartTime time.Time `json:"startTime"`
+}
 
+type market struct {
+	Id string `json:"id"`
+	NameTranslations translation `json:"nameTranslations"`
+	Selections []selection `json:"selections"`
+}
+
+type translation struct {
+	Value string `json:"value"`
+}
+
+type selection struct {
+	NameTranslations translation `json:"nameTranslations"`
+	PrimaryPrice price `json:"primaryPrice"`
+	Sort string `json:"sort"`
+}
+
+type price struct {
+	DecimalOdds float64 `json:"decimalOdds"`
+}
 
 
 const end = '\u0000'
@@ -68,10 +97,10 @@ func getJsonMatch(eventId string) (string, error) {
 		}
 		msgs = string(msg[:n])
 		result+=msgs
-		if len(msgs)<7 || msgs[len(msgs)-7:]=="\"null\"]"{
+		if (len(msgs)>=7 && msgs[len(msgs)-7:]=="\"null\"]") || len(msgs)<1{
 			return "",errors.New("bad response 4 '"+msgs+"' '"+result[len(result)-50:]+"'")
 		}
-		if msgs[len(msgs)-8:]=="\\u0000\"]"{
+		if len(msgs)>=8 && msgs[len(msgs)-8:]=="\\u0000\"]"{
 			break
 		}
 	}
@@ -87,7 +116,23 @@ func main() {
 	if err!=nil{
 		panic(err)
 	}
-	err = ioutil.WriteFile("test.json", []byte(test), 0644)
+	//err = ioutil.WriteFile("test2.json", []byte(test), 0644)
+	object := &allMarkets{}
+	err = json.Unmarshal([]byte(test),object)
+	if err!=nil {
+		panic(err)
+	}
+	t:=object.StartTime
+	fmt.Printf("%d-%02d-%02dT%02d:%02d:%02d-00:00\n",
+		t.Year(), t.Month(), t.Day(),
+		t.Hour(), t.Minute(), t.Second())
+	for _,m := range object.Markets {
+		for _,s := range m.Selections {
+			fmt.Println(s.PrimaryPrice)
+		}
+	}
+	i:=1
+	i++
 }
 
 

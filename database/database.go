@@ -6,7 +6,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"sync"
 	"time"
-	"strings"
 	"stavkova/misc"
 )
 
@@ -47,26 +46,31 @@ func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
 	return db, nil
 }
 
-func (d *Database) GetSites() ([]dbSite, error) {
+func (d *Database) GetSites() ([]DbSite, error) {
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	rows, err := d.db.Query("SELECT `id`,`name` FROM `bet_company`;")
+	rows, err := d.db.Query("SELECT `id`,`name`,`routines_count`,`tasks_per_time`,`wait_sec_per_tasks` FROM `bet_company`;")
 	if err != nil {
 		fmt.Println("cant select from bet_company")
 		return nil, err
 	}
 	defer rows.Close()
 
-	var sites []dbSite
+	var sites []DbSite
 
 	for rows.Next() {
-		var id int
+		var id, routinesCount, tasksPerTime, waitSeconds int
 		var name string
-		if err := rows.Scan(&id, &name); err != nil {
+		if err := rows.Scan(&id, &name, &routinesCount, &tasksPerTime, &waitSeconds); err != nil {
 			fmt.Println(err)
 			continue
 		}
-		sites = append(sites, dbSite{id, name})
+		sites = append(sites, DbSite{
+			id,
+			routinesCount,
+			tasksPerTime,
+			waitSeconds, name,
+		})
 	}
 	return sites, nil
 }

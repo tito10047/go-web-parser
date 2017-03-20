@@ -10,5 +10,4 @@ charset = "utf8"
 timezone = "Europe/Bratislava"
 
 [system]
-routine_count=10
 similar_text_percent=70.0

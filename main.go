@@ -47,41 +47,41 @@ func main() {
 		panic(err)
 	}
 
-	getId := func(siteName string) (int,bool){
+	getDbSite := func(siteName string) (*database.DbSite,bool){
 		for _,site := range dbSites {
 			if site.Name==siteName{
-				return site.Id, true
+				return &site, true
 			}
 		}
 		fmt.Println("cant find id for site "+siteName)
-		return 0,false
+		return nil,false
 	}
 
-	var sitesArr []sites.Site
-	for site := range sites.NextSite(getId,db){
+	var sitesArr []sites.SiteInt
+	for site := range sites.NextSite(getDbSite,db){
 		sitesArr = append(sitesArr, *site)
 	}
 
 	var wg sync.WaitGroup
-	var MAX_ROUTINES int = settings.System.RoutineCount/len(sitesArr)
-	fmt.Println("MAX_ROUTINES",MAX_ROUTINES)
-	if MAX_ROUTINES<MIN_ROUTINES{
-		fmt.Println("minimum coroutines is "+strconv.Itoa(MIN_ROUTINES)+", now is "+strconv.Itoa(MAX_ROUTINES))
-		return
-	}
+
 	guard := make([]chan struct{},len(sitesArr))
 	for index,site := range sitesArr {
 		wg.Add(1)
-		fmt.Println("starting main routine for site ",site.GetId())
-		go func(site sites.Site, index int) {
+		fmt.Println("starting main routine for site ",site.GetArgs().Id)
+		go func(site sites.SiteInt, index int) {
 			defer wg.Done()
-			guard[index] = make(chan struct{}, MAX_ROUTINES)
-			site.Setup(MAX_ROUTINES)
+			guard[index] = make(chan struct{}, site.GetArgs().RoutinesCount)
+			site.Setup(site.GetArgs().RoutinesCount,site.GetArgs().TasksPerTime,site.GetArgs().WaitSeconds)
 			for site.HasNext() {
 				guard[index] <- struct{}{}
 				wg.Add(1)
-				go func(site sites.Site, index int) {
+				go func(site sites.SiteInt, index int) {
 					defer wg.Done()
+					defer func() {
+						if r:=recover(); r!=nil{
+							fmt.Println("Recovered in f", r)
+						}
+					}()
 
 					site.ParseNext()
 

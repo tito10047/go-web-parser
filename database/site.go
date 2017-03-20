@@ -1,6 +1,9 @@
 package database
 
-type dbSite struct {
-	Id   int
-	Name string
+type DbSite struct {
+	Id            int
+	RoutinesCount int
+	TasksPerTime  int
+	WaitSeconds   int
+	Name          string
 }

@@ -1,5 +1,7 @@
 package ladbrokes
 
+import "time"
+
 // all sports
 type allSports struct {
 	MostPopSportsGroup groups `json:"mostPopSportsGroup"`
@@ -53,4 +55,35 @@ type event struct {
 type participant struct {
 	Id string `json:"id"`
 	Name string `json:"name"`
+}
+
+//stavky wss://sports.ladbrokes.com/api/055/lwefiu0x/websocket
+
+type allMarkets struct {
+	Status string `json:"status"`
+	Markets []market `json:"markets"`
+	CorrectScore1Selections []market `json:"correctScore1Selections"`
+	CorrectScoreXSelections []market `json:"correctScoreXSelections"`
+	CorrectScore2Selections []market `json:"correctScore2Selections"`
+	StartTime time.Time `json:"startTime"`
+}
+
+type market struct {
+	Id string `json:"id"`
+	NameTranslations translation `json:"nameTranslations"`
+	Selections []selection `json:"selections"`
+}
+
+type translation struct {
+	Value string `json:"value"`
+}
+
+type selection struct {
+	NameTranslations translation `json:"nameTranslations"`
+	PrimaryPrice price `json:"primaryPrice"`
+	Sort string `json:"sort"`
+}
+
+type price struct {
+	DecimalOdds float64 `json:"decimalOdds"`
 }
