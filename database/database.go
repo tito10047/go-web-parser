@@ -49,7 +49,7 @@ func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
 func (d *Database) GetSites() ([]DbSite, error) {
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	rows, err := d.db.Query("SELECT `id`,`name`,`routines_count`,`tasks_per_time`,`wait_sec_per_tasks` FROM `bet_company` WHERE `enabled`=1;")
+	rows, err := d.db.Query("SELECT `id`,`name`,`routines_count`,`tasks_per_time`,`wait_sec_per_tasks`,`Enabled` FROM `bet_company`;")
 	if err != nil {
 		fmt.Println("cant select from bet_company")
 		return nil, err
@@ -61,7 +61,8 @@ func (d *Database) GetSites() ([]DbSite, error) {
 	for rows.Next() {
 		var id, routinesCount, tasksPerTime, waitSeconds int
 		var name string
-		if err := rows.Scan(&id, &name, &routinesCount, &tasksPerTime, &waitSeconds); err != nil {
+		var enabled bool
+		if err := rows.Scan(&id, &name, &routinesCount, &tasksPerTime, &waitSeconds, &enabled); err != nil {
 			fmt.Println(err)
 			continue
 		}
@@ -70,6 +71,7 @@ func (d *Database) GetSites() ([]DbSite, error) {
 			routinesCount,
 			tasksPerTime,
 			waitSeconds, name,
+			enabled,
 		})
 	}
 	return sites, nil

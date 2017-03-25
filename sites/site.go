@@ -78,7 +78,7 @@ func (ts *TaskStack) NextTask() (*myTask, bool) {
 func (ts *TaskStack) HasTask() bool {
 	ts.totalTaskLocker.Lock()
 	defer ts.totalTaskLocker.Unlock()
-	return ts.taskCount == 0
+	return ts.taskCount > 0
 }
 
 func (ts *TaskStack) CloseTasks() {
@@ -110,8 +110,10 @@ func NextSite(getId func(siteName string) (*database.DbSite, bool), db *database
 			if !ok {
 				continue
 			}
-			site := createSite(name, dbSite, db)
-			ch <- site
+			if dbSite.Enabled {
+				site := createSite(name, dbSite, db)
+				ch <- site
+			}
 		}
 		close(ch)
 	}()

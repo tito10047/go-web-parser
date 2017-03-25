@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	host = "https://www.skybet.com/"
+	host = "https://www.skybet.com"
 	parseSportList    int8 = iota
 	parseSport
+	parseEvents
 )
 
 type Site struct {
@@ -43,14 +44,28 @@ func (s *Site) ParseNext() {
 	switch task.TaskNum {
 	case parseSportList:
 		err = s.parseSportList(task.Url)
+	case parseSport:
+		err = s.parseSport(task.Url, task.Params[0].(string), task.Params[1].(string), task.Params[2].(int), task.Params[3].(int))
+	case parseEvents:
+		err = s.parseEvents(task.Url,task.Params[0].(int))
 	default:
 		err = errors.New("some is wrong")
 	}
 	if err != nil {
+		s.ok=false
 		s.CloseTasks()
 		panic(err)
 	}
 }
+
+func (s *Site) HasNext() bool {
+	return s.HasTask() == true && s.ok == true
+}
+
+func (s *Site) GetArgs() *database.DbSite {
+	return s.dbSite
+}
+
 func (s *Site) parseSportList(url string) error {
 	defer s.EndTask()
 	d, err := sites.NewDownloader("GET", url)
@@ -76,12 +91,91 @@ func (s *Site) parseSportList(url string) error {
 		if ok {
 			for _,attr := range aNode.Attr {
 				if attr.Key=="href" {
-					s.AddTask(parseSport, host+attr.Val,[]interface{}{sportId})
+					s.AddTask(parseSport, host+attr.Val+"/ev_time/all",[]interface{}{"","today",1,sportId})
+					break
 				}
 			}
 		}
 	}
 
+	return nil
+}
+
+func (s *Site) parseSport(url, params, day string, page, sportId int) error {
+	defer s.EndTask()
+	d, err := sites.NewDownloader("GET", url+params)
+	if err!=nil {
+		return err
+	}
+	html, err := d.Download()
+	if err!=nil {
+		return err
+	}
+	doc, err := xhtml.Parse(strings.NewReader(html))
+	if err!=nil {
+		return err
+	}
+
+	// paginate days
+	if day=="today" && page==1 {
+		selector, err := cascadia.Compile(".pagination.day-pagination>li>a")
+		if err!=nil {
+			return err
+		}
+		aNodes := selector.MatchAll(doc)
+		for index, aNode := range aNodes {
+			if index==0 {
+				continue
+			}
+			for _,attr := range aNode.Attr {
+				if attr.Key == "href" {
+					s.AddTask(parseSport, url,[]interface{}{attr.Val,"",1,sportId})
+					break
+				}
+			}
+		}
+	}
+
+	// paginate pages
+	if page==1 {
+		selector, err := cascadia.Compile("ol.pagination.below.meta-pagination>li>a")
+		if err != nil {
+			return err
+		}
+		aNodes := selector.MatchAll(doc)
+		for index, aNode := range aNodes {
+			if index == 0 {
+				continue
+			}
+			for _, attr := range aNode.Attr {
+				if attr.Key == "href" {
+					s.AddTask(parseSport, url, []interface{}{attr.Val,"", index+1, sportId})
+					break
+				}
+			}
+		}
+	}
+
+	selector, err := cascadia.Compile(".market-wdw>table.mkt>tbody>tr>td>.all-bets-link")
+	if err!=nil {
+		return err
+	}
+	trNodes := selector.MatchAll(doc)
+	for _, trNode := range trNodes {
+		for _, attr := range trNode.Attr {
+			if attr.Key == "href" {
+				s.AddTask(parseEvents, host+attr.Val, []interface{}{sportId})
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Site) parseEvents(url string, sportId int) error {
+	defer s.EndTask()
+	fmt.Println(url)
 	return nil
 }
 

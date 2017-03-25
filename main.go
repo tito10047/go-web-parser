@@ -3,6 +3,7 @@ package main
 import (
 	"stavkova/database"
 	_ "stavkova/sites/ladbrokes"
+	_ "stavkova/sites/skybet"
 	"github.com/BurntSushi/toml"
 	"fmt"
 	"strconv"

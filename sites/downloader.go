@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"errors"
 	"encoding/json"
+	"time"
 )
 
 type contentType string
@@ -70,7 +71,7 @@ func (r *downloader) Download() (string, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{Transport: tr, Timeout:time.Second*3}
 	response, err := client.Do(r.Request)
 	if err != nil {
 		return "", err

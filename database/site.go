@@ -6,4 +6,5 @@ type DbSite struct {
 	TasksPerTime  int
 	WaitSeconds   int
 	Name          string
+	Enabled       bool
 }

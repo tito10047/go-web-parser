@@ -56,13 +56,14 @@ func (s *Site) ParseNext() {
 		err = errors.New("some is wrong")
 	}
 	if err != nil {
+		s.ok=false
 		s.CloseTasks()
 		panic(err)
 	}
 }
 
 func (s *Site) HasNext() bool {
-	return s.HasTask() == false && s.ok == true
+	return s.HasTask() == true && s.ok == true
 }
 
 func (s *Site) GetArgs() *database.DbSite {
