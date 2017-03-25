@@ -4,6 +4,7 @@ import (
 	"stavkova/database"
 	_ "stavkova/sites/ladbrokes"
 	_ "stavkova/sites/skybet"
+	_ "stavkova/sites/paddy"
 	"github.com/BurntSushi/toml"
 	"fmt"
 	"strconv"

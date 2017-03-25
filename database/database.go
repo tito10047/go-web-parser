@@ -10,25 +10,25 @@ import (
 )
 
 type Database struct {
-	db           *sql.DB
-	similarity   float64
-	sports       map[string]int
-	types        map[string]int
-	teams        map[int]map[string]int
-	muxSports    sync.Mutex
-	muxTypes     sync.Mutex
-	muxTeams     sync.Mutex
-	muxDB        sync.Mutex
+	db         *sql.DB
+	similarity float64
+	sports     map[string]int
+	types      map[string]int
+	teams      map[int]map[string]int
+	muxSports  sync.Mutex
+	muxTypes   sync.Mutex
+	muxTeams   sync.Mutex
+	muxDB      sync.Mutex
 }
 
 func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
 
 	db := &Database{
-		db:           dbSource,
-		similarity:   similarity,
-		sports:       make(map[string]int),
-		types:        make(map[string]int),
-		teams:        make(map[int]map[string]int),
+		db:         dbSource,
+		similarity: similarity,
+		sports:     make(map[string]int),
+		types:      make(map[string]int),
+		teams:      make(map[int]map[string]int),
 	}
 
 	if err := db.loadSports(); err != nil {
@@ -95,8 +95,7 @@ func (d *Database) GetSportId(name string) (int, bool) {
 	defer d.muxDB.Unlock()
 	stmt, err := d.db.Prepare("INSERT bet_sport_name SET name=?, id_bet_sport=?")
 	if err != nil {
-		fmt.Println(err)
-		return 0, false
+		panic(err)
 	}
 	defer stmt.Close()
 
@@ -123,10 +122,9 @@ func (d *Database) GetTypeId(name string) (int, bool) {
 
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	stmt, err := d.db.Prepare("INSERT bet_match_type_name SET name=?, id_bet_type=?")
+	stmt, err := d.db.Prepare("INSERT bet_match_type_name SET name=?, id_bet_match_type=?")
 	if err != nil {
-		fmt.Println(err)
-		return 0, false
+		panic(err)
 	}
 	defer stmt.Close()
 	_, err = stmt.Exec(name, typeId)
@@ -149,14 +147,13 @@ func (d *Database) GetTeamId(sportId int, name string) (int, bool) {
 		d.teams[sportId] = make(map[string]int)
 	}
 
-	teamId  := d.findSimilarId(d.teams[sportId], name)
+	teamId := d.findSimilarId(d.teams[sportId], name)
 
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
 	stmt, err := d.db.Prepare("INSERT `bet_team_name` SET `id_bet_sport`=?, id_bet_team=?, `name`=?")
 	if err != nil {
-		fmt.Println(err)
-		return 0, false
+		panic(err)
 	}
 	defer stmt.Close()
 	_, err = stmt.Exec(sportId, teamId, name)
@@ -168,68 +165,106 @@ func (d *Database) GetTeamId(sportId int, name string) (int, bool) {
 	return 0, false
 }
 
-
 /**
  * @
  */
-func (d *Database) InsertMatch(siteId, sportId, typeId int, teamA, teamB string, date time.Time, orgId int) (int, error) {
-	/*d.muxDB.Lock()
+func (d *Database) InsertMatch(siteId, sportId, typeId int, name string, teamA, teamB int, date time.Time, orgId int) (int, error) {
+	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
 
-	stmt, err := d.db.Prepare("SELECT * FROM `bet_match` WHERE `id_bet_company` = '1' AND `id_bet_sport` = '1' AND `id_bet_match_type` = '1' AND `org_id` = '1'")
+	stmt, err := d.db.Prepare("SELECT `id`, `date` FROM `bet_match` WHERE `id_bet_company` = ? AND `id_bet_sport` = ? AND `id_bet_match_type` = ? AND `org_id` = ?")
 	defer stmt.Close()
 	if err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
-	entryRow := stmt.QueryRow(sportId)
-*/
-	return 0,nil
-	/*
+	matchRow := stmt.QueryRow(siteId, sportId, typeId, orgId)
 
-	var entryId int64
-	err = entryRow.Scan(&entryId)
-	if err!=nil{
-		if err!=sql.ErrNoRows{
+	var matchId int64
+	var prevDate time.Time
+	err = matchRow.Scan(&matchId, &date)
+	if err != nil {
+		if err != sql.ErrNoRows {
 			fmt.Println(err)
-			return
+			return 0, err
 		}
-
-		stmt, err = d.db.Prepare("INSERT `bet_entry` SET `id_bet_company`=?, `id_bet_sport`=?, `id_bet_type`=?, `max_bet`=?, `date`=?, `org_id`=?, ")
+		stmt, err = d.db.Prepare("INSERT INTO `bet_match` SET `id_bet_company`=?, `id_bet_sport`=?, `id_bet_match_type`=?, `name`=?, `team_a`=?, `team_b`=?, `date`=?, `org_id`=?")
 		if err != nil {
-			fmt.Println(err)
-			return
+			panic(err)
 		}
 		defer stmt.Close()
-		//TODO: max bet
-		res, err := stmt.Exec(siteId, sportId, typeId,0,date,orgId)
+		ta := sql.NullInt64{Int64: int64(teamA), Valid:teamA != -1}
+		tb := sql.NullInt64{Int64: int64(teamA), Valid:teamB != -1}
+		res, err := stmt.Exec(siteId, sportId, typeId, name, ta, tb, date, orgId)
 		if err != nil {
 			fmt.Println(err)
-			return
+			return 0, err
 		}
-		entryId, err = res.LastInsertId()
+		matchId, err = res.LastInsertId()
 		if err != nil {
 			fmt.Println(err)
-			return
+			return 0, err
+		}
+	} else {
+		if !prevDate.Equal(date) {
+			stmt, err = d.db.Prepare("UPDATE `bet_match` SET `date` = ? WHERE `id` = ?")
+			if err != nil {
+				panic(err)
+			}
+			defer stmt.Close()
+			_, err := stmt.Exec(date, matchId)
+			if err != nil {
+				fmt.Println(err)
+				return 0, err
+			}
 		}
 	}
-
-	for _,entry := range teams{
-		stmt, err = d.db.Prepare("INSERT INTO `bet_entry_team` (`id_entry`, `id_team`, `odd`) VALUES (?,?,?) on duplicate key update `odd`=?")
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		_, err := stmt.Exec(entryId, typeId, entry.TeamId, entry.Odd)
-		if err != nil {
-			fmt.Println(err)
-		}
-		stmt.Close()
-	}
-
-	return*/
+	return int(matchId), nil
 }
 
+func (d *Database) InsertMatchSelection(matchId int, name string, odds float64, orgId int) error {
+	d.muxDB.Lock()
+	defer d.muxDB.Unlock()
+
+	stmt, err := d.db.Prepare("SELECT id, odds FROM `bet_mach_selection` WHERE `id_bet_match`=? AND `org_id`=?")
+	defer stmt.Close()
+	if err != nil {
+		panic(err)
+	}
+	selectionRow := stmt.QueryRow(matchId, orgId)
+	var selectionId int64
+	var orgOdds float64
+	err = selectionRow.Scan(&selectionId, &orgOdds)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			fmt.Println(err)
+			return err
+		}
+		stmt, err = d.db.Prepare("INSERT INTO `bet_mach_selection` SET `id_bet_match`=?, `name`=?, `odds`=?, `org_id`=?")
+		if err != nil {
+			panic(err)
+		}
+		defer stmt.Close()
+		_, err := stmt.Exec(matchId, name, odds, orgId)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+	}else{
+		if orgOdds!=odds {
+			stmt, err = d.db.Prepare("UPDATE `bet_mach_selection` SET `odds`=?, last_update=NOW() WHERE `id`=?")
+			if err != nil {
+				panic(err)
+			}
+			defer stmt.Close()
+			_, err := stmt.Exec(odds, matchId)
+			if err != nil {
+				fmt.Println(err)
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 func (d *Database) findSimilarId(m map[string]int, name string) sql.NullInt64 {
 	id := sql.NullInt64{Valid: false}

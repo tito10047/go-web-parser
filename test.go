@@ -9,28 +9,27 @@ import (
 )
 
 func main() {
-	d, err := sites.NewDownloader("GET", "https://www.skybet.com/")
+
+	d, err := sites.NewDownloader("GET", "http://www.paddypower.com/bet")
 	check(err)
 	html, err := d.Download()
 	check(err)
 	doc, err := xhtml.Parse(strings.NewReader(html))
 
-	selector, err := cascadia.Compile("#nav .section:nth-child(5n+4)>ul>a")
+	selector, err := cascadia.Compile("#nav>#sitemap li>a[href^=\"http\"]")
 	check(err)
 
 	aNodes := selector.MatchAll(doc)
 
-	for _,aNode := range aNodes {
-		for _,attr := range aNode.Attr{
+	for _, aNode := range aNodes {
+		for _, attr := range aNode.Attr {
 			fmt.Println(attr.Val)
 		}
 	}
 }
 
-
-
 func check(e error) {
-	if e!=nil {
+	if e != nil {
 		panic(e)
 	}
 }

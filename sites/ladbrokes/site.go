@@ -219,6 +219,5 @@ func (s *Site) parseEvent(sportId, aTeamId, bTeamId int, realSportId string) (er
 }
 
 func init() {
-	fmt.Println("registering ladbrokes")
 	sites.RegisterSite("ladbrokes", NewSite)
 }

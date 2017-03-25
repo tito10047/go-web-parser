@@ -181,6 +181,5 @@ func (s *Site) parseEvents(url string, sportId int) error {
 
 
 func init() {
-	fmt.Println("registering skybet")
 	sites.RegisterSite("skybet", NewSite)
 }
