@@ -40,10 +40,10 @@ func (ts *TaskStack) AddTask(task int8, url string, args []interface{}) {
 	ts.taskCount++
 	go func() {
 		ts.totalTaskLocker.Lock()
-		defer ts.totalTaskLocker.Unlock()
 		if ts.taskCount==tasksClosed{
 			return
 		}
+		ts.totalTaskLocker.Unlock()
 		ts.tasks <- &myTask{
 			task,
 			url,
