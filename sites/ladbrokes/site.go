@@ -23,7 +23,6 @@ type Site struct {
 	*sites.TaskStack
 	dbSite *database.DbSite
 	db     *database.Database
-	cnt    int
 	ok     bool
 }
 
@@ -195,10 +194,14 @@ func getJsonMatch(eventId string) (string, error) {
 		}
 		msgs = string(msg[:n])
 		result+=msgs
-		if len(msgs)<7 || msgs[len(msgs)-7:]=="\"null\"]"{
-			return "",errors.New("bad response 4 '"+msgs+"' '"+result[len(result)-50:]+"'")
+		if (len(result)>=7 && result[len(result)-7:]=="\"null\"]") || (len(result)>=7 && result[len(result)-7:]=="a[\"\\n\"]") || len(msgs)==0 {
+			msg := result
+			if len(msg)>20 {
+				msg=msg[len(msg)-20:]
+			}
+			return "",errors.New("bad response 4 '"+msg+"'")
 		}
-		if msgs[len(msgs)-8:]=="\\u0000\"]"{
+		if len(result)>=8 && result[len(result)-8:]=="\\u0000\"]"{
 			break
 		}
 	}

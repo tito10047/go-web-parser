@@ -37,9 +37,9 @@ func (d *Database) loadTypes() error {
 	defer d.muxTypes.Unlock()
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	types, err := d.db.Query("SELECT `id_bet_type`, `bet_type_name`.`name`, enabled FROM `bet_type_name` LEFT JOIN bet_type ON bet_type.id=id_bet_type;")
+	types, err := d.db.Query("SELECT `id_bet_match_type`, `bet_match_type_name`.`name`, enabled FROM `bet_match_type_name` LEFT JOIN bet_match_type ON bet_match_type.id=id_bet_match_type;")
 	if err != nil {
-		fmt.Println("cant select from id_bet_type")
+		fmt.Println("cant select from bet_match_type_name")
 		return err
 	}
 	for types.Next() {
@@ -66,7 +66,7 @@ func (d *Database) loadTeams() error {
 	defer d.muxDB.Unlock()
 	sports, err := d.db.Query("SELECT `id` FROM `bet_sport`;")
 	if err != nil {
-		fmt.Println("cant select from id_bet_type")
+		fmt.Println("cant select from bet_sport")
 		return err
 	}
 	for sports.Next() {

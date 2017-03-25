@@ -49,7 +49,7 @@ func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
 func (d *Database) GetSites() ([]DbSite, error) {
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	rows, err := d.db.Query("SELECT `id`,`name`,`routines_count`,`tasks_per_time`,`wait_sec_per_tasks` FROM `bet_company`;")
+	rows, err := d.db.Query("SELECT `id`,`name`,`routines_count`,`tasks_per_time`,`wait_sec_per_tasks` FROM `bet_company` WHERE `enabled`=1;")
 	if err != nil {
 		fmt.Println("cant select from bet_company")
 		return nil, err
@@ -119,7 +119,7 @@ func (d *Database) GetTypeId(name string) (int, bool) {
 
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	stmt, err := d.db.Prepare("INSERT bet_type_name SET name=?, id_bet_type=?")
+	stmt, err := d.db.Prepare("INSERT bet_match_type_name SET name=?, id_bet_type=?")
 	if err != nil {
 		fmt.Println(err)
 		return 0, false
@@ -172,7 +172,9 @@ type EntryTeam struct {
  * @
  */
 func (d *Database) InsertEntry(siteId, sportId, typeId int, teams[]EntryTeam, date time.Time, orgId int) {
-	d.muxDB.Lock()
+	//TODO implement new database structure
+	return
+	/*d.muxDB.Lock()
 	defer d.muxDB.Unlock()
 
 	stmt, err := d.db.Prepare("SELECT * FROM `bet_entry` WHERE `id_bet_company`=? AND `id_bet_sport`=? AND `id_bet_type`=? AND `org_id`=?")
@@ -223,7 +225,7 @@ func (d *Database) InsertEntry(siteId, sportId, typeId int, teams[]EntryTeam, da
 		stmt.Close()
 	}
 
-	return
+	return*/
 }
 
 
