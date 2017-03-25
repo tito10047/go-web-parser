@@ -49,7 +49,7 @@ func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
 func (d *Database) GetSites() ([]DbSite, error) {
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	rows, err := d.db.Query("SELECT `id`,`name`,`routines_count`,`tasks_per_time`,`wait_sec_per_tasks`,`Enabled` FROM `bet_company`;")
+	rows, err := d.db.Query("SELECT `id`,`name`,`routines_count`,`tasks_per_time`,`wait_sec_per_tasks`,`enabled`,`timezone` FROM `bet_company`;")
 	if err != nil {
 		fmt.Println("cant select from bet_company")
 		return nil, err
@@ -62,7 +62,8 @@ func (d *Database) GetSites() ([]DbSite, error) {
 		var id, routinesCount, tasksPerTime, waitSeconds int
 		var name string
 		var enabled bool
-		if err := rows.Scan(&id, &name, &routinesCount, &tasksPerTime, &waitSeconds, &enabled); err != nil {
+		var timezone int
+		if err := rows.Scan(&id, &name, &routinesCount, &tasksPerTime, &waitSeconds, &enabled, &timezone); err != nil {
 			fmt.Println(err)
 			continue
 		}
@@ -72,6 +73,7 @@ func (d *Database) GetSites() ([]DbSite, error) {
 			tasksPerTime,
 			waitSeconds, name,
 			enabled,
+			timezone,
 		})
 	}
 	return sites, nil
@@ -166,26 +168,24 @@ func (d *Database) GetTeamId(sportId int, name string) (int, bool) {
 	return 0, false
 }
 
-type EntryTeam struct {
-	TeamId sql.NullInt64
-	Odd	float64
-}
+
 /**
  * @
  */
-func (d *Database) InsertEntry(siteId, sportId, typeId int, teams[]EntryTeam, date time.Time, orgId int) {
-	//TODO implement new database structure
-	return
+func (d *Database) InsertMatch(siteId, sportId, typeId int, teamA, teamB string, date time.Time, orgId int) (int, error) {
 	/*d.muxDB.Lock()
 	defer d.muxDB.Unlock()
 
-	stmt, err := d.db.Prepare("SELECT * FROM `bet_entry` WHERE `id_bet_company`=? AND `id_bet_sport`=? AND `id_bet_type`=? AND `org_id`=?")
+	stmt, err := d.db.Prepare("SELECT * FROM `bet_match` WHERE `id_bet_company` = '1' AND `id_bet_sport` = '1' AND `id_bet_match_type` = '1' AND `org_id` = '1'")
 	defer stmt.Close()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	entryRow := stmt.QueryRow(sportId)
+*/
+	return 0,nil
+	/*
 
 	var entryId int64
 	err = entryRow.Scan(&entryId)

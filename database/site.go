@@ -7,4 +7,5 @@ type DbSite struct {
 	WaitSeconds   int
 	Name          string
 	Enabled       bool
+	Timezone      int
 }
