@@ -3,11 +3,13 @@ package ladbrokes
 import (
 	"stavkova/database"
 	"stavkova/sites"
-	"fmt"
-	"log"
 	"golang.org/x/net/websocket"
 	"errors"
 	"strings"
+	"encoding/json"
+	"strconv"
+	"fmt"
+	"math/rand"
 )
 
 const (
@@ -51,7 +53,7 @@ func (s *Site) ParseNext() {
 	case parseEvents:
 		err = s.parseEvents(task.Url, task.Params[0].(int))
 	case parseEvent:
-		err = s.parseEvent(task.Params[0].(int), task.Params[1].(int), task.Params[2].(int), task.Params[3].(string))
+		err = s.parseEvent(task.Params[0].(int), task.Params[1].(string))
 	default:
 		err = errors.New("some is wrong")
 	}
@@ -104,6 +106,9 @@ func (s *Site) parseCompetition(url string, sportId int) (err error) {
 
 	for _, competitionGroup := range competitions.LinkGroupsForClasses {
 		for _, competition := range competitionGroup.List {
+			if competition.Id==""{
+				fmt.Println("BAD competetion id is empty '"+url+"' - '"+competition.Text)
+			}
 			s.AddTask(parseEvents, host+"/en-gb/events/type/0/0/"+competition.Id, []interface{}{sportId})
 		}
 	}
@@ -124,27 +129,28 @@ func (s *Site) parseEvents(url string, sportId int) (err error) {
 	}
 
 	for _, event := range events.AllEventsGroup.List {
-		if len(event.Event.Participants)==0{
-			continue
-		}
-		if len(event.Event.Participants)<2{
-			return errors.New("cosi je zle")
-		}
-		aTeamId, okA := s.db.GetTeamId(sportId, event.Event.Participants[0].Name)
-		bTeamId, okB := s.db.GetTeamId(sportId, event.Event.Participants[1].Name)
-		if okA == false || okB == false {
-			continue
-		}
-		s.AddTask(parseEvent, "", []interface{}{sportId, aTeamId, bTeamId, event.Id})
+		s.AddTask(parseEvent, "", []interface{}{sportId, event.Id})
 	}
 
 	return nil
 }
+const letterBytes = "abcdefghijklmnopqrstuvwxyz0123456789"
 
+func RandStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
 func getJsonMatch(eventId string) (string, error) {
 
+	uid := RandStringBytes(8)
+	uid2 := strconv.Itoa(rand.Intn(3))
+
 	origin := "https://sports.ladbrokes.com"
-	url := "wss://sports.ladbrokes.com/api/055/lwefiu0x/websocket"
+	//url := "wss://sports.ladbrokes.com/api/055/lwefiu0x/websocket"
+	url := "wss://sports.ladbrokes.com/api/"+uid2+"/"+uid+"/websocket"
 
 	ws, err := websocket.Dial(url, "", origin)
 	if err != nil {
@@ -154,7 +160,7 @@ func getJsonMatch(eventId string) (string, error) {
 	var msg = make([]byte, 1024)
 	var n int
 	if n, err = ws.Read(msg); err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	msgs := string(msg[:n])
 	if msgs!="o"{
@@ -165,18 +171,18 @@ func getJsonMatch(eventId string) (string, error) {
 	}
 	msg = make([]byte, 1024)
 	if n, err = ws.Read(msg); err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	msgs = string(msg[:n])
 	if msgs!="a[\"CONNECTED\\nversion:1.1\\nheart-beat:10000,10000\\n\\n\\u0000\"]"{
 		return "",errors.New("bad response 2 '"+msgs+"'")
 	}
 	if _, err := ws.Write([]byte("[\"SUBSCRIBE\\nid:/user/request-response\\ndestination:/user/request-response\\n\\n\\u0000\"]")); err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	msg = make([]byte, 1024)
 	if n, err = ws.Read(msg); err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	msgs = string(msg[:n])
 	if len(msgs)<22 || msgs[:22]!="a[\"MESSAGE\\ntype:READY"{
@@ -184,7 +190,7 @@ func getJsonMatch(eventId string) (string, error) {
 	}
 	if _, err := ws.Write([]byte("[\"SUBSCRIBE\\nid:/api/en-GB/events/"+eventId+"\\ndestination:/api/en-GB/events/"+eventId+"\\n\\n\\u0000\"]")); err != nil {
 		//if _, err := ws.Write([]byte("[\"SUBSCRIBE\\nid:/api/en-GB/eventDetail-groups/EventGroup-LIVE-110000006-F\\ndestination:/api/en-GB/eventDetail-groups/EventGroup-LIVE-110000006-F\\n\\n\\u0000\"]")); err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	msg=nil
 	result := ""
@@ -213,8 +219,75 @@ func getJsonMatch(eventId string) (string, error) {
 	return result, nil
 }
 
-func (s *Site) parseEvent(sportId, aTeamId, bTeamId int, realSportId string) (err error) {
+func (s *Site) parseEvent(sportId int, realSportId string) (err error) {
 	defer s.EndTask()
+	jsonStream, err := getJsonMatch(realSportId)
+	if err!=nil{
+		fmt.Println(err)
+		return err
+	}
+
+	markets := &allMarkets{}
+	err = json.Unmarshal([]byte(jsonStream),markets)
+	if err!=nil {
+		fmt.Println(err)
+		return err
+	}
+
+	if markets.Status!="ACTIVE"{
+		return nil
+	}
+
+	var teamA, teamB = -1,-1
+	if markets.Stats!=nil{
+		maybeTeamA, okA := s.db.GetTeamId(sportId, markets.Stats.NameA)
+		maybeTeamB, okB := s.db.GetTeamId(sportId, markets.Stats.NameB)
+		if okA {
+			teamA = maybeTeamA
+		}
+		if okB {
+			teamB = maybeTeamB
+		}
+	}
+	id, err := strconv.ParseInt(realSportId, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	matchId, err := s.db.InsertMatch(s.dbSite.Id,sportId,markets.Name,teamA,teamB,markets.StartTime,int(id))
+	if err!=nil{
+		return err
+	}
+
+	var marketsArr = []*[]market{
+		markets.Markets,
+		markets.CorrectScore1Selections,
+		markets.CorrectScoreXSelections,
+		markets.CorrectScore2Selections,
+	}
+	for _, market := range marketsArr {
+		if market == nil {
+			continue
+		}
+		for _, m := range *market {
+			if m.Selections == nil {
+				continue
+			}
+			typeId, ok := s.db.GetTypeId(m.Name)
+			if !ok {
+				continue
+			}
+			for _, selections := range *m.Selections {
+
+				selectionId, err := strconv.ParseInt(realSportId, 10, 64)
+				if err != nil {
+					return err
+				}
+				s.db.InsertMatchSelection(matchId, typeId, selections.Name, selections.PrimaryPrice.DecimalOdds, int(selectionId))
+			}
+		}
+	}
+
 	return nil
 }
 

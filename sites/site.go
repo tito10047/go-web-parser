@@ -27,7 +27,7 @@ type TaskStack struct {
 
 func NewTaskStack(routinesCount, tasksPerTime, waitSeconds int) *TaskStack {
 	t := &TaskStack{
-		tasks:        make(chan *myTask, routinesCount),
+		tasks:        make(chan *myTask),
 		tasksPerTime: tasksPerTime,
 		waitSeconds:  waitSeconds,
 	}
@@ -37,19 +37,29 @@ func NewTaskStack(routinesCount, tasksPerTime, waitSeconds int) *TaskStack {
 func (ts *TaskStack) AddTask(task int8, url string, args []interface{}) {
 	ts.totalTaskLocker.Lock()
 	defer ts.totalTaskLocker.Unlock()
+	if ts.taskCount==tasksClosed{
+		return
+	}
 	ts.taskCount++
-	go func() {
-		ts.totalTaskLocker.Lock()
-		if ts.taskCount==tasksClosed{
-			return
-		}
-		ts.totalTaskLocker.Unlock()
+	go func(task int8, url string, args []interface{}) {
 		ts.tasks <- &myTask{
 			task,
 			url,
 			args,
 		}
-	}()
+	}(task,url,args)
+}
+
+func (ts *TaskStack) closeTaskChannel(isLocked bool)  {
+	if !isLocked {
+		ts.totalTaskLocker.Lock()
+		defer ts.totalTaskLocker.Unlock()
+	}
+	for ;ts.taskCount!=tasksClosed && ts.taskCount>0;ts.taskCount--{
+		<-ts.tasks
+	}
+	ts.taskCount=tasksClosed
+	close(ts.tasks)
 }
 
 func (ts *TaskStack) EndTask() {
@@ -57,19 +67,19 @@ func (ts *TaskStack) EndTask() {
 	defer ts.totalTaskLocker.Unlock()
 	ts.taskCount--
 	if ts.taskCount == 0 {
-		close(ts.tasks)
+		ts.closeTaskChannel(true)
 	}
 }
 
 func (ts *TaskStack) NextTask() (*myTask, bool) {
 	ts.currentTaskLocker.Lock()
-	defer ts.currentTaskLocker.Unlock()
 
 	ts.startedTasks++
 	if ts.startedTasks >= ts.tasksPerTime {
 		ts.startedTasks = 0
 		time.Sleep(time.Duration(ts.waitSeconds) * time.Second)
 	}
+	ts.currentTaskLocker.Unlock()
 
 	task, ok := <-ts.tasks
 	return task, ok
@@ -78,14 +88,11 @@ func (ts *TaskStack) NextTask() (*myTask, bool) {
 func (ts *TaskStack) HasTask() bool {
 	ts.totalTaskLocker.Lock()
 	defer ts.totalTaskLocker.Unlock()
-	return ts.taskCount > 0
+	return ts.taskCount != tasksClosed
 }
 
 func (ts *TaskStack) CloseTasks() {
-	ts.totalTaskLocker.Lock()
-	defer ts.totalTaskLocker.Unlock()
-	ts.taskCount = tasksClosed
-	close(ts.tasks)
+	ts.closeTaskChannel(false)
 }
 
 type SiteInt interface {

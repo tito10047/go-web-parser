@@ -14,13 +14,15 @@ import (
 	"stavkova/sites"
 	"stavkova/src"
 	"sync"
+	"time"
+	"math/rand"
 )
 
 const MIN_ROUTINES = 1
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
+	rand.Seed(time.Now().UTC().UnixNano())
 	var settings src.TomlSettings
 
 	if _, err := toml.DecodeFile("settings.toml", &settings); err != nil {
@@ -79,12 +81,11 @@ func main() {
 				wg.Add(1)
 				go func(site sites.SiteInt, index int) {
 					defer wg.Done()
-					defer func() {
-						if r:=recover(); r!=nil{
-							fmt.Println("Recovered in f", r)
-						}
-					}()
-
+					//defer func() {
+					//	if r:=recover(); r!=nil{
+					//		fmt.Println("Recovered in f", r)
+					//	}
+					//}()
 					site.ParseNext()
 
 					<-guard[index]

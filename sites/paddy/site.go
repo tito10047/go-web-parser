@@ -89,7 +89,7 @@ func (s *Site) parseSportList(url string) error {
 		if ok {
 			for _,attr := range aNode.Attr {
 				if attr.Key=="href" {
-					s.AddTask(parseSport, attr.Val,[]interface{}{"","today",1,sportId})
+					s.AddTask(parseSportList, attr.Val,[]interface{}{"","today",1,sportId})
 					break
 				}
 			}

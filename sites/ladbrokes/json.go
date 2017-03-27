@@ -45,11 +45,6 @@ type eventGroup struct {
 
 type eventDetail struct {
 	Id           string `json:"id"`
-	Event event `json:"event"`
-}
-
-type event struct {
-	Participants []participant `json:"participants"`
 }
 
 type participant struct {
@@ -57,33 +52,38 @@ type participant struct {
 	Name string `json:"name"`
 }
 
-//stavky wss://sports.ladbrokes.com/api/055/lwefiu0x/websocket
+//stavky wss://sports.ladbrokes.com/api/055/lwefiu0x/websocket events
 
 type allMarkets struct {
 	Status string `json:"status"`
-	Markets []market `json:"markets"`
-	CorrectScore1Selections []market `json:"correctScore1Selections"`
-	CorrectScoreXSelections []market `json:"correctScoreXSelections"`
-	CorrectScore2Selections []market `json:"correctScore2Selections"`
+	Markets *[]market `json:"markets"`
+	CorrectScore1Selections *[]market `json:"correctScore1Selections"`
+	CorrectScoreXSelections *[]market `json:"correctScoreXSelections"`
+	CorrectScore2Selections *[]market `json:"correctScore2Selections"`
 	StartTime time.Time `json:"startTime"`
+	Stats *stats `json:"stats"`
+	Name string `json:"name"`
+}
+
+type stats struct {
+	NameA string `json:"nameA"`
+	NameB string `json:"nameB"`
 }
 
 type market struct {
 	Id string `json:"id"`
-	NameTranslations translation `json:"nameTranslations"`
-	Selections []selection `json:"selections"`
-}
-
-type translation struct {
-	Value string `json:"value"`
+	Selections *[]selection `json:"selections"`
+	Name string `json:"name"`
 }
 
 type selection struct {
-	NameTranslations translation `json:"nameTranslations"`
+	Id string `json:"id"`
 	PrimaryPrice price `json:"primaryPrice"`
-	Sort string `json:"sort"`
+	Name string `json:"name"`
 }
 
 type price struct {
 	DecimalOdds float64 `json:"decimalOdds"`
 }
+
+//stavky wss://sports.ladbrokes.com/api/055/lwefiu0x/websocket races

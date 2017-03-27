@@ -10,6 +10,7 @@ import (
 	"errors"
 	"encoding/json"
 	"time"
+	"fmt"
 )
 
 type contentType string
@@ -74,6 +75,7 @@ func (r *downloader) Download() (string, error) {
 	client := &http.Client{Transport: tr, Timeout:time.Second*3}
 	response, err := client.Do(r.Request)
 	if err != nil {
+		fmt.Println(err)
 		return "", err
 	}
 	defer response.Body.Close()
@@ -86,6 +88,7 @@ func (r *downloader) Download() (string, error) {
 func (r *downloader) DownloadJson(object interface{}) error {
 	jsonStream, err := r.Download()
 	if err!=nil {
+		fmt.Println(err)
 		return err
 	}
 	err = json.Unmarshal([]byte(jsonStream),object)

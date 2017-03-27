@@ -122,7 +122,7 @@ func (d *Database) GetTypeId(name string) (int, bool) {
 
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	stmt, err := d.db.Prepare("INSERT bet_match_type_name SET name=?, id_bet_match_type=?")
+	stmt, err := d.db.Prepare("INSERT bet_match_selection_type_name SET name=?, id_bet_match_type=?")
 	if err != nil {
 		panic(err)
 	}
@@ -158,8 +158,7 @@ func (d *Database) GetTeamId(sportId int, name string) (int, bool) {
 	defer stmt.Close()
 	_, err = stmt.Exec(sportId, teamId, name)
 	if err != nil {
-		fmt.Println(err)
-		return 0, false
+		panic(err)
 	}
 	d.teams[sportId][name] = -1
 	return 0, false
@@ -168,16 +167,16 @@ func (d *Database) GetTeamId(sportId int, name string) (int, bool) {
 /**
  * @
  */
-func (d *Database) InsertMatch(siteId, sportId, typeId int, name string, teamA, teamB int, date time.Time, orgId int) (int, error) {
+func (d *Database) InsertMatch(siteId, sportId int, name string, teamA, teamB int, date time.Time, orgId int) (int, error) {
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
 
-	stmt, err := d.db.Prepare("SELECT `id`, `date` FROM `bet_match` WHERE `id_bet_company` = ? AND `id_bet_sport` = ? AND `id_bet_match_type` = ? AND `org_id` = ?")
+	stmt, err := d.db.Prepare("SELECT `id`, `date` FROM `bet_match` WHERE `id_bet_company` = ? AND `id_bet_sport` = ? AND `org_id` = ?")
 	defer stmt.Close()
 	if err != nil {
 		panic(err)
 	}
-	matchRow := stmt.QueryRow(siteId, sportId, typeId, orgId)
+	matchRow := stmt.QueryRow(siteId, sportId, orgId)
 
 	var matchId int64
 	var prevDate time.Time
@@ -187,14 +186,15 @@ func (d *Database) InsertMatch(siteId, sportId, typeId int, name string, teamA, 
 			fmt.Println(err)
 			return 0, err
 		}
-		stmt, err = d.db.Prepare("INSERT INTO `bet_match` SET `id_bet_company`=?, `id_bet_sport`=?, `id_bet_match_type`=?, `name`=?, `team_a`=?, `team_b`=?, `date`=?, `org_id`=?")
+		stmt, err = d.db.Prepare("INSERT INTO `bet_match` SET `id_bet_company`=?, `id_bet_sport`=?, `name`=?, `team_a`=?, `team_b`=?, `date`=?, `org_id`=?")
 		if err != nil {
 			panic(err)
 		}
 		defer stmt.Close()
 		ta := sql.NullInt64{Int64: int64(teamA), Valid:teamA != -1}
-		tb := sql.NullInt64{Int64: int64(teamA), Valid:teamB != -1}
-		res, err := stmt.Exec(siteId, sportId, typeId, name, ta, tb, date, orgId)
+		tb := sql.NullInt64{Int64: int64(teamB), Valid:teamB != -1}
+		fmt.Println(siteId, sportId, name, ta, tb, date, orgId)
+		res, err := stmt.Exec(siteId, sportId, name, ta, tb, date, orgId)
 		if err != nil {
 			fmt.Println(err)
 			return 0, err
@@ -221,7 +221,7 @@ func (d *Database) InsertMatch(siteId, sportId, typeId int, name string, teamA, 
 	return int(matchId), nil
 }
 
-func (d *Database) InsertMatchSelection(matchId int, name string, odds float64, orgId int) error {
+func (d *Database) InsertMatchSelection(matchId, typeId int, name string, odds float64, orgId int) error {
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
 
@@ -239,12 +239,12 @@ func (d *Database) InsertMatchSelection(matchId int, name string, odds float64, 
 			fmt.Println(err)
 			return err
 		}
-		stmt, err = d.db.Prepare("INSERT INTO `bet_mach_selection` SET `id_bet_match`=?, `name`=?, `odds`=?, `org_id`=?")
+		stmt, err = d.db.Prepare("INSERT INTO `bet_mach_selection` SET `id_bet_match`=?, id_bet_match_selection_type=?, `name`=?, `odds`=?, `org_id`=?")
 		if err != nil {
 			panic(err)
 		}
 		defer stmt.Close()
-		_, err := stmt.Exec(matchId, name, odds, orgId)
+		_, err := stmt.Exec(matchId, typeId, name, odds, orgId)
 		if err != nil {
 			fmt.Println(err)
 			return err
