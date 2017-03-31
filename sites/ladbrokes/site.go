@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"fmt"
 	"math/rand"
+	"regexp"
 )
 
 const (
@@ -19,6 +20,7 @@ const (
 	parseCompetitions
 	parseEvents
 	parseEvent
+	parseHorseRace
 )
 
 type Site struct {
@@ -54,6 +56,8 @@ func (s *Site) ParseNext() {
 		err = s.parseEvents(task.Url, task.Params[0].(int))
 	case parseEvent:
 		err = s.parseEvent(task.Params[0].(int), task.Params[1].(string))
+	case parseHorseRace:
+		err = s.parseHorseRace(task.Params[0].(int),task.Params[1].(string))
 	default:
 		err = errors.New("some is wrong")
 	}
@@ -109,7 +113,19 @@ func (s *Site) parseCompetition(url string, sportId int) (err error) {
 			if competition.Id==""{
 				fmt.Println("BAD competetion id is empty '"+url+"' - '"+competition.Text)
 			}
-			s.AddTask(parseEvents, host+"/en-gb/events/type/0/0/"+competition.Id, []interface{}{sportId})
+			if competition.Event==false {
+				s.AddTask(parseEvents, host+"/en-gb/events/type/0/0/"+competition.Id, []interface{}{sportId})
+			}else{
+				var re = regexp.MustCompile(`(?U)\/racing\/.*\/.*\/\d*\/(\d*)\/?$`)
+				if len(re.FindStringIndex(competition.Href)) > 0 {
+					var idStr = re.FindStringSubmatch(competition.Href)[0]
+					raceId, err := strconv.ParseInt(idStr, 10, 64)
+					if err != nil {
+						continue
+					}
+					s.AddTask(parseHorseRace,"",[]interface{}{sportId, raceId})
+				}
+			}
 		}
 	}
 
@@ -143,7 +159,12 @@ func RandStringBytes(n int) string {
 	}
 	return string(b)
 }
-func getJsonMatch(eventId string) (string, error) {
+type matchType string
+const (
+	eventsType matchType = "events"
+	racesType matchType = "races"
+)
+func getJsonMatch(eventId string, mType matchType) (string, error) {
 
 	uid := RandStringBytes(8)
 	uid2 := strconv.Itoa(rand.Intn(3))
@@ -188,7 +209,7 @@ func getJsonMatch(eventId string) (string, error) {
 	if len(msgs)<22 || msgs[:22]!="a[\"MESSAGE\\ntype:READY"{
 		return "",errors.New("bad response 3 '"+msgs+"'")
 	}
-	if _, err := ws.Write([]byte("[\"SUBSCRIBE\\nid:/api/en-GB/events/"+eventId+"\\ndestination:/api/en-GB/events/"+eventId+"\\n\\n\\u0000\"]")); err != nil {
+	if _, err := ws.Write([]byte("[\"SUBSCRIBE\\nid:/api/en-GB/"+string(mType)+"/"+eventId+"\\ndestination:/api/en-GB/"+string(mType)+"/"+eventId+"\\n\\n\\u0000\"]")); err != nil {
 		//if _, err := ws.Write([]byte("[\"SUBSCRIBE\\nid:/api/en-GB/eventDetail-groups/EventGroup-LIVE-110000006-F\\ndestination:/api/en-GB/eventDetail-groups/EventGroup-LIVE-110000006-F\\n\\n\\u0000\"]")); err != nil {
 		panic(err)
 	}
@@ -221,7 +242,7 @@ func getJsonMatch(eventId string) (string, error) {
 
 func (s *Site) parseEvent(sportId int, realSportId string) (err error) {
 	defer s.EndTask()
-	jsonStream, err := getJsonMatch(realSportId)
+	jsonStream, err := getJsonMatch(realSportId, eventsType)
 	if err!=nil{
 		fmt.Println(err)
 		return err
@@ -279,7 +300,57 @@ func (s *Site) parseEvent(sportId int, realSportId string) (err error) {
 			}
 			for _, selections := range *m.Selections {
 
-				selectionId, err := strconv.ParseInt(realSportId, 10, 64)
+				selectionId, err := strconv.ParseInt(selections.Id, 10, 64)
+				if err != nil {
+					return err
+				}
+				s.db.InsertMatchSelection(matchId, typeId, selections.Name, selections.PrimaryPrice.DecimalOdds, int(selectionId))
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Site ) parseHorseRace(sportId int, raceId string) error {
+	defer s.EndTask()
+	jsonStream, err := getJsonMatch(raceId, racesType)
+	if err!=nil{
+		fmt.Println(err)
+		return err
+	}
+
+	race := &allHorseRaces{}
+	err = json.Unmarshal([]byte(jsonStream),race)
+	if err!=nil {
+		fmt.Println(err)
+		return err
+	}
+
+	raceName := race.Race.SportsBookClass.Name
+
+	id, err := strconv.ParseInt(raceId, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	matchId, err := s.db.InsertMatch(s.dbSite.Id,sportId,raceName,-1,-1,race.Race.StartTime,int(id))
+	if err!=nil{
+		return err
+	}
+
+	for _, group := range race.MarketGroups {
+		for _, m := range group.Markets {
+			if m.Selections == nil {
+				continue
+			}
+			typeId, ok := s.db.GetTypeId(m.Name)
+			if !ok {
+				continue
+			}
+			for _, selections := range *m.Selections {
+
+				selectionId, err := strconv.ParseInt(selections.Id, 10, 64)
 				if err != nil {
 					return err
 				}

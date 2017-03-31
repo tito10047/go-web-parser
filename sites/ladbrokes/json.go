@@ -15,6 +15,7 @@ type groups struct {
 	DeepLinkHref string `json:"deepLinkHref"`
 	SortOrder    int `json:"sortOrder"`
 	Id           string `json:"id"`
+	Event bool `json:"event"`
 }
 
 type group struct {
@@ -44,25 +45,25 @@ type eventGroup struct {
 }
 
 type eventDetail struct {
-	Id           string `json:"id"`
+	Id    string `json:"id"`
 }
 
 type participant struct {
-	Id string `json:"id"`
+	Id   string `json:"id"`
 	Name string `json:"name"`
 }
 
 //stavky wss://sports.ladbrokes.com/api/055/lwefiu0x/websocket events
 
 type allMarkets struct {
-	Status string `json:"status"`
-	Markets *[]market `json:"markets"`
+	Status                  string `json:"status"`
+	Markets                 *[]market `json:"markets"`
 	CorrectScore1Selections *[]market `json:"correctScore1Selections"`
 	CorrectScoreXSelections *[]market `json:"correctScoreXSelections"`
 	CorrectScore2Selections *[]market `json:"correctScore2Selections"`
-	StartTime time.Time `json:"startTime"`
-	Stats *stats `json:"stats"`
-	Name string `json:"name"`
+	StartTime               time.Time `json:"startTime"`
+	Stats                   *stats `json:"stats"`
+	Name                    string `json:"name"`
 }
 
 type stats struct {
@@ -71,15 +72,15 @@ type stats struct {
 }
 
 type market struct {
-	Id string `json:"id"`
+	Id         string `json:"id"`
 	Selections *[]selection `json:"selections"`
-	Name string `json:"name"`
+	Name       string `json:"name"`
 }
 
 type selection struct {
-	Id string `json:"id"`
+	Id           string `json:"id"`
 	PrimaryPrice price `json:"primaryPrice"`
-	Name string `json:"name"`
+	Name         string `json:"name"`
 }
 
 type price struct {
@@ -87,3 +88,21 @@ type price struct {
 }
 
 //stavky wss://sports.ladbrokes.com/api/055/lwefiu0x/websocket races
+
+type allHorseRaces struct {
+	Race horseRace `json:"race"`
+	MarketGroups []marketGroup `json:"marketGroups"`
+}
+
+type horseRace struct {
+	SportsBookClass sportsBookClass `json:"sportsBookClass"`
+	StartTime               time.Time `json:"startTime"`
+}
+
+type sportsBookClass struct {
+	Name string `json:"name"`
+}
+
+type marketGroup struct {
+	Markets []market `json:"markets"`
+}
