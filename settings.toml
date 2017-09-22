@@ -3,9 +3,9 @@ title = "settings"
 [database]
 host = "localhost"
 port = 3306
-name = "stavkova"
+name = "filmy"
 user = "root"
-password = "mostka"
+password = "mostkaj"
 charset = "utf8"
 timezone = "Europe/Bratislava"
 

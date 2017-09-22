@@ -1,8 +1,8 @@
 package skybet
 
 import (
-	"stavkova/database"
-	"stavkova/sites"
+	"go-web-parser/database"
+	"go-web-parser/sites"
 	"errors"
 	"fmt"
 	"strings"

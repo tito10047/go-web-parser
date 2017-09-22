@@ -1,8 +1,8 @@
 package paddy
 
 import (
-	"stavkova/sites"
-	"stavkova/database"
+	"go-web-parser/sites"
+	"go-web-parser/database"
 	"strings"
 	"github.com/andybalholm/cascadia"
 	xhtml "golang.org/x/net/html"

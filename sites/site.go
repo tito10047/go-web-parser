@@ -1,7 +1,7 @@
 package sites
 
 import (
-	"stavkova/database"
+	"go-web-parser/database"
 	"reflect"
 	"sync"
 	"time"

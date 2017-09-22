@@ -1,8 +1,8 @@
 package ladbrokes
 
 import (
-	"stavkova/database"
-	"stavkova/sites"
+	"go-web-parser/database"
+	"go-web-parser/sites"
 	"golang.org/x/net/websocket"
 	"errors"
 	"strings"
