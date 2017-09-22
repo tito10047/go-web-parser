@@ -12,12 +12,6 @@ import (
 type Database struct {
 	db         *sql.DB
 	similarity float64
-	sports     map[string]int
-	types      map[string]int
-	teams      map[int]map[string]int
-	muxSports  sync.Mutex
-	muxTypes   sync.Mutex
-	muxTeams   sync.Mutex
 	muxDB      sync.Mutex
 }
 
@@ -26,22 +20,8 @@ func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
 	db := &Database{
 		db:         dbSource,
 		similarity: similarity,
-		sports:     make(map[string]int),
-		types:      make(map[string]int),
-		teams:      make(map[int]map[string]int),
 	}
 
-	if err := db.loadSports(); err != nil {
-		return db, err
-	}
-
-	if err := db.loadTypes(); err != nil {
-		return db, err
-	}
-
-	if err := db.loadTeams(); err != nil {
-		return db, err
-	}
 
 	return db, nil
 }
@@ -49,7 +29,7 @@ func NewDatabase(dbSource *sql.DB, similarity float64) (*Database, error) {
 func (d *Database) GetSites() ([]DbSite, error) {
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()
-	rows, err := d.db.Query("SELECT `id`,`name`,`routines_count`,`tasks_per_time`,`wait_sec_per_tasks`,`enabled`,`timezone` FROM `bet_company`;")
+	rows, err := d.db.Query("SELECT `id`,`name`,`routines_count`,`tasks_per_time`,`wait_sec_per_tasks`,`enabled`,`timezone` FROM `parse_site`;")
 	if err != nil {
 		fmt.Println("cant select from bet_company")
 		return nil, err
@@ -79,94 +59,6 @@ func (d *Database) GetSites() ([]DbSite, error) {
 	return sites, nil
 }
 
-func (d *Database) GetSportId(name string) (int, bool) {
-	d.muxSports.Lock()
-	defer d.muxSports.Unlock()
-	if id, ok := d.sports[name]; ok {
-		if id == -1 {
-			return 0, false
-		}
-		return id, true
-	}
-
-	sportId := d.findSimilarId(d.sports, name)
-
-	d.muxDB.Lock()
-	defer d.muxDB.Unlock()
-	stmt, err := d.db.Prepare("INSERT bet_sport_name SET name=?, id_bet_sport=?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(name, sportId)
-	if err != nil {
-		fmt.Println(err)
-		return 0, false
-	}
-	d.sports[name] = -1
-	return 0, false
-}
-
-func (d *Database) GetTypeId(name string) (int, bool) {
-	d.muxTypes.Lock()
-	defer d.muxTypes.Unlock()
-	if id, ok := d.types[name]; ok {
-		if id == -1 {
-			return 0, false
-		}
-		return id, true
-	}
-
-	typeId := d.findSimilarId(d.types, name)
-
-	d.muxDB.Lock()
-	defer d.muxDB.Unlock()
-	stmt, err := d.db.Prepare("INSERT bet_match_selection_type_name SET name=?, id_bet_match_type=?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-	_, err = stmt.Exec(name, typeId)
-	if err != nil {
-		fmt.Println(err)
-		return 0, false
-	}
-	d.types[name] = -1
-	return 0, false
-}
-
-func (d *Database) GetTeamId(sportId int, name string) (int, bool) {
-	d.muxTeams.Lock()
-	defer d.muxTeams.Unlock()
-	if teams, ok := d.teams[sportId]; ok {
-		if id, ok := teams[name]; ok {
-			return id, true
-		}
-	} else {
-		d.teams[sportId] = make(map[string]int)
-	}
-
-	teamId := d.findSimilarId(d.teams[sportId], name)
-
-	d.muxDB.Lock()
-	defer d.muxDB.Unlock()
-	stmt, err := d.db.Prepare("INSERT `bet_team_name` SET `id_bet_sport`=?, id_bet_team=?, `name`=?")
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-	_, err = stmt.Exec(sportId, teamId, name)
-	if err != nil {
-		panic(err)
-	}
-	d.teams[sportId][name] = -1
-	return 0, false
-}
-
-/**
- * @
- */
 func (d *Database) InsertMatch(siteId, sportId int, name string, teamA, teamB int, date time.Time, orgId int) (int, error) {
 	d.muxDB.Lock()
 	defer d.muxDB.Unlock()

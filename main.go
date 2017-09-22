@@ -2,9 +2,9 @@ package main
 
 import (
 	"go-web-parser/database"
-	_ "go-web-parser/sites/ladbrokes"
-	_ "go-web-parser/sites/skybet"
-	_ "go-web-parser/sites/paddy"
+	//_ "go-web-parser/sites/ladbrokes"
+	//_ "go-web-parser/sites/skybet"
+	//_ "go-web-parser/sites/paddy"
 	"github.com/BurntSushi/toml"
 	"fmt"
 	"strconv"
